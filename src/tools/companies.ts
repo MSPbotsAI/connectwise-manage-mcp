@@ -36,6 +36,23 @@ export function registerCompanyTools(server: McpServer, client: CwManageClient) 
   );
 
   server.tool(
+    "cw_list_sites",
+    "List a company's sites (locations) with their IDs and addresses, e.g. to pick the site for a new contact.",
+    {
+      companyId: z.number().describe("Company ID"),
+      conditions: z.string().optional().describe("Optional ConnectWise conditions, e.g. name like \"%Main%\""),
+      pageSize: z.number().optional().describe("Results per page (default: 100, max: 1000)"),
+    },
+    async ({ companyId, conditions, pageSize }) => {
+      const result = await client.get(`/company/companies/${companyId}/sites`, {
+        conditions,
+        pageSize: pageSize ?? 100,
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.tool(
     "cw_create_company",
     "Create a new company.",
     {

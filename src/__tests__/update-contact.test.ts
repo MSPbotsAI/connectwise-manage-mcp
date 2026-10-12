@@ -117,7 +117,7 @@ describe("cw_update_contact", () => {
         "cw_close_adjustment",
       ]),
     );
-    expect(names).toHaveLength(83);
+    expect(names).toHaveLength(86);
   });
 
   it("patches name, title, site, inactive flag, communication items, and custom fields", async () => {
@@ -306,5 +306,114 @@ describe("cw_update_contact_types", () => {
 
     expect(toolError(body)).toMatch(/requires typeId or typeName/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("PRD-20219 onboarding contact tools", () => {
+  it("cw_create_contact sends site, address, department, manager, types and extra communication items", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(fakeResponse({ id: 77 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    toolText(
+      await mcp("tools/call", {
+        name: "cw_create_contact",
+        arguments: {
+          firstName: "Ada",
+          lastName: "Lovelace",
+          companyId: 5,
+          email: "ada@example.com",
+          siteId: 7,
+          addressLine1: "1 Main St",
+          city: "Springfield",
+          state: "IL",
+          zip: "62701",
+          departmentId: 3,
+          managerContactId: 9,
+          typeIds: [2],
+          communicationItems: [
+            { communicationType: "Phone", typeName: "Cell", value: "555-0199" },
+            { communicationType: "Phone", typeName: "Direct", value: "555-0100", extension: "42" },
+          ],
+        },
+      }),
+    );
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, { method: string; body: string }];
+    expect(url).toContain("/company/contacts");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({
+      firstName: "Ada",
+      lastName: "Lovelace",
+      company: { id: 5 },
+      site: { id: 7 },
+      addressLine1: "1 Main St",
+      city: "Springfield",
+      state: "IL",
+      zip: "62701",
+      department: { id: 3 },
+      managerContact: { id: 9 },
+      typeIds: [2],
+      communicationItems: [
+        { type: { name: "Email" }, value: "ada@example.com", communicationType: "Email" },
+        { type: { name: "Cell" }, value: "555-0199", communicationType: "Phone" },
+        { type: { name: "Direct" }, value: "555-0100", communicationType: "Phone", extension: "42" },
+      ],
+    });
+  });
+
+  it("cw_create_contact with only the original fields keeps the original body", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(fakeResponse({ id: 78 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    toolText(
+      await mcp("tools/call", {
+        name: "cw_create_contact",
+        arguments: { firstName: "Ada", lastName: "Lovelace", companyId: 5, phone: "555-0100" },
+      }),
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(init.body)).toEqual({
+      firstName: "Ada",
+      lastName: "Lovelace",
+      company: { id: 5 },
+      communicationItems: [{ type: { name: "Direct" }, value: "555-0100", communicationType: "Phone" }],
+    });
+  });
+
+  it("cw_add_contact_communication posts a single item", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(fakeResponse({ id: 501 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    toolText(
+      await mcp("tools/call", {
+        name: "cw_add_contact_communication",
+        arguments: { id: 42, communicationType: "Phone", typeName: "Cell", value: "555-0199", defaultFlag: true },
+      }),
+    );
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, { method: string; body: string }];
+    expect(url).toContain("/company/contacts/42/communications");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({
+      type: { name: "Cell" },
+      value: "555-0199",
+      communicationType: "Phone",
+      defaultFlag: true,
+    });
+  });
+
+  it("cw_list_sites and cw_list_contact_types hit the Manage list endpoints", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse([{ id: 7, name: "Main" }]))
+      .mockResolvedValueOnce(fakeResponse([{ id: 2, name: "Primary" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(toolText(await mcp("tools/call", { name: "cw_list_sites", arguments: { companyId: 5 } }))).toContain("Main");
+    expect(toolText(await mcp("tools/call", { name: "cw_list_contact_types", arguments: {} }))).toContain("Primary");
+
+    expect(fetchMock.mock.calls[0][0] as string).toContain("/company/companies/5/sites");
+    expect(fetchMock.mock.calls[1][0] as string).toContain("/company/contacts/types");
   });
 });

@@ -46,6 +46,27 @@ const contactPatchOperation = z.discriminatedUnion("op", [
   }),
 ]);
 
+const contactCommunicationItem = z.object({
+  communicationType: z.enum(["Phone", "Email", "Fax"]).describe("Item kind"),
+  typeName: z
+    .string()
+    .describe('Communication type name as configured in Manage, e.g. "Direct", "Cell", "Email"'),
+  value: z.string().describe("Phone number, email address or fax number"),
+  extension: z.string().optional().describe("Phone extension"),
+  defaultFlag: z.boolean().optional().describe("Make this the default item of its kind"),
+});
+
+function toCommunicationItem(item: z.infer<typeof contactCommunicationItem>): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    type: { name: item.typeName },
+    value: item.value,
+    communicationType: item.communicationType,
+  };
+  if (item.extension) out.extension = item.extension;
+  if (item.defaultFlag !== undefined) out.defaultFlag = item.defaultFlag;
+  return out;
+}
+
 export function registerContactTools(server: McpServer, client: CwManageClient) {
   server.tool(
     "cw_search_contacts",
@@ -98,7 +119,7 @@ export function registerContactTools(server: McpServer, client: CwManageClient) 
 
   server.tool(
     "cw_create_contact",
-    "Create a new contact.",
+    "Create a new contact. Besides name/company you can set site, address, department, manager, contact types (typeIds from cw_list_contact_types) and any number of phone/email items via communicationItems (e.g. a Cell plus a Direct with extension). email/phone are shortcuts for one Email and one Direct item.",
     {
       firstName: z.string().describe("First name"),
       lastName: z.string().describe("Last name"),
@@ -106,14 +127,42 @@ export function registerContactTools(server: McpServer, client: CwManageClient) 
       email: z.string().optional().describe("Email address"),
       phone: z.string().optional().describe("Phone number"),
       title: z.string().optional().describe("Job title"),
+      siteId: z.number().optional().describe("Company site ID (from cw_list_sites)"),
+      addressLine1: z.string().optional().describe("Address line 1"),
+      addressLine2: z.string().optional().describe("Address line 2"),
+      city: z.string().optional().describe("City"),
+      state: z.string().optional().describe("State / province"),
+      zip: z.string().optional().describe("Postal / ZIP code"),
+      departmentId: z.number().optional().describe("Contact department ID"),
+      managerContactId: z.number().optional().describe("Contact ID of this contact's manager"),
+      typeIds: z
+        .array(z.number())
+        .optional()
+        .describe("Contact type IDs (from cw_list_contact_types). Manage only accepts types at creation; afterwards use cw_update_contact_types."),
+      communicationItems: z
+        .array(contactCommunicationItem)
+        .optional()
+        .describe("Extra phone/email/fax items, appended after the email/phone shortcuts"),
     },
-    async ({ firstName, lastName, companyId, email, phone, title }) => {
+    async ({
+      firstName, lastName, companyId, email, phone, title, siteId, addressLine1, addressLine2,
+      city, state, zip, departmentId, managerContactId, typeIds, communicationItems,
+    }) => {
       const body: Record<string, unknown> = {
         firstName,
         lastName,
         company: { id: companyId },
       };
       if (title) body.title = title;
+      if (siteId !== undefined) body.site = { id: siteId };
+      if (addressLine1) body.addressLine1 = addressLine1;
+      if (addressLine2) body.addressLine2 = addressLine2;
+      if (city) body.city = city;
+      if (state) body.state = state;
+      if (zip) body.zip = zip;
+      if (departmentId !== undefined) body.department = { id: departmentId };
+      if (managerContactId !== undefined) body.managerContact = { id: managerContactId };
+      if (typeIds?.length) body.typeIds = typeIds;
 
       // CW Manage uses communicationItems for email/phone
       const comms: Array<Record<string, unknown>> = [];
@@ -123,9 +172,40 @@ export function registerContactTools(server: McpServer, client: CwManageClient) 
       if (phone) {
         comms.push({ type: { name: "Direct" }, value: phone, communicationType: "Phone" });
       }
+      for (const item of communicationItems ?? []) comms.push(toCommunicationItem(item));
       if (comms.length) body.communicationItems = comms;
 
       const result = await client.post("/company/contacts", body);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.tool(
+    "cw_add_contact_communication",
+    "Add one phone, email or fax item to an existing contact without touching its other items (Manage POST /company/contacts/{id}/communications). Use this instead of replacing the whole communicationItems array with cw_update_contact.",
+    {
+      id: z.number().describe("Contact ID"),
+      ...contactCommunicationItem.shape,
+    },
+    async ({ id, ...item }) => {
+      const result = await client.post(`/company/contacts/${id}/communications`, toCommunicationItem(item));
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.tool(
+    "cw_list_contact_types",
+    "List contact types (e.g. Primary, Decision Maker) with their IDs, for cw_create_contact typeIds or cw_update_contact_types.",
+    {
+      conditions: z.string().optional().describe('Optional filter, e.g. name like "Dec%"'),
+      pageSize: z.number().optional().describe("Results per page (default: 100, max: 1000)"),
+    },
+    async ({ conditions, pageSize }) => {
+      const result = await client.get("/company/contacts/types", {
+        conditions,
+        pageSize: pageSize ?? 100,
+        orderBy: "name asc",
+      });
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     },
   );
