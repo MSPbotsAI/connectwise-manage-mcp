@@ -164,7 +164,8 @@ export function registerContactTools(server: McpServer, client: CwManageClient) 
       if (zip) body.zip = zip;
       if (departmentId !== undefined) body.department = { id: departmentId };
       if (managerContactId !== undefined) body.managerContact = { id: managerContactId };
-      if (typeIds?.length) body.typeIds = typeIds;
+      // Manage silently drops a typeIds field on create; types must be references.
+      if (typeIds?.length) body.types = typeIds.map((id) => ({ id }));
 
       // CW Manage uses communicationItems for email/phone
       const comms: Array<Record<string, unknown>> = [];
@@ -218,7 +219,7 @@ export function registerContactTools(server: McpServer, client: CwManageClient) 
 
   server.tool(
     "cw_update_contact",
-    "Update an existing contact with JSON Patch (Manage PATCH /company/contacts/{id}). Operations use the same shape as cw_update_ticket and cw_update_company: op (replace, add, or remove), path, and value. Add and replace require value. Common paths: firstName, lastName, title, inactiveFlag, site (value is { \"id\": <siteId> }), communicationItems (email and phone — replacing the array replaces every item, so include items to keep; each item is { \"type\": { \"name\": \"Email\" }, \"value\": \"...\", \"communicationType\": \"Email\" } or communicationType \"Phone\"), and customFields (array of { \"id\", \"value\" }). Contact types such as \"Decision Maker\" are a child collection. Manage accepts typeIds only when creating a contact and rejects types on this patch. Use cw_update_contact_types to add or remove a type.",
+    "Update an existing contact with JSON Patch (Manage PATCH /company/contacts/{id}). Operations use the same shape as cw_update_ticket and cw_update_company: op (replace, add, or remove), path, and value. Add and replace require value. Common paths: firstName, lastName, title, inactiveFlag, site (value is { \"id\": <siteId> }), communicationItems (email and phone — replacing the array replaces every item, so include items to keep; each item is { \"type\": { \"name\": \"Email\" }, \"value\": \"...\", \"communicationType\": \"Email\" } or communicationType \"Phone\"), and customFields (array of { \"id\", \"value\" }). Contact types such as \"Decision Maker\" are a child collection. Manage accepts types only when creating a contact and rejects them on this patch. Use cw_update_contact_types to add or remove a type.",
     {
       id: z.number().describe("Contact ID"),
       operations: z

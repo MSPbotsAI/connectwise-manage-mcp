@@ -1,7 +1,8 @@
 /**
  * Contact type updates.
  *
- * Manage's Contact.typeIds is create-only. The model documents that existing
+ * Manage's Contact.types is create-only (sent as [{ id }]; a typeIds field is
+ * silently ignored). The model documents that existing
  * contacts change type through /company/contacts/{id}/typeAssociations (or
  * /company/contactTypeAssociations), not through PATCH /company/contacts/{id}.
  * cw_update_contact therefore rejects type paths, and cw_update_contact_types
@@ -9,7 +10,7 @@
  */
 
 export const CONTACT_TYPE_PATCH_ERROR =
-  'Contact types are a child collection and cannot be changed with cw_update_contact. Manage accepts typeIds only when creating a contact; updates go to POST or DELETE /company/contacts/{id}/typeAssociations. Use cw_update_contact_types (for example typeName "Decision Maker").';
+  'Contact types are a child collection and cannot be changed with cw_update_contact. Manage accepts types only when creating a contact; updates go to POST or DELETE /company/contacts/{id}/typeAssociations. Use cw_update_contact_types (for example typeName "Decision Maker").';
 
 const CONTACT_TYPE_PATCH_PATH = /^\/?(?:types|typeIds)(?:\/.*)?$/;
 

@@ -362,7 +362,8 @@ describe("PRD-20219 onboarding contact tools", () => {
       zip: "62701",
       department: { id: 3 },
       managerContact: { id: 9 },
-      typeIds: [2],
+      // Manage ignores typeIds on create; types must be references.
+      types: [{ id: 2 }],
       communicationItems: [
         { type: { name: "Email" }, value: "ada@example.com", communicationType: "Email" },
         { type: { name: "Cell" }, value: "555-0199", communicationType: "Phone" },
