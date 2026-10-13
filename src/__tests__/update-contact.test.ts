@@ -119,6 +119,8 @@ describe("cw_update_contact", () => {
         "cw_create_contact",
         "cw_update_contact",
         "cw_update_contact_types",
+        "cw_add_contact_communication",
+        "cw_update_contact_communication",
         "cw_update_agreement_addition",
         "cw_search_schedule_entries",
         "cw_create_schedule_entry",
@@ -127,7 +129,7 @@ describe("cw_update_contact", () => {
         "cw_close_adjustment",
       ]),
     );
-    expect(names).toHaveLength(86);
+    expect(names).toHaveLength(87);
   });
 
   it("patches name, title, site, inactive flag, communication items, and custom fields", async () => {
@@ -412,6 +414,42 @@ describe("PRD-20219 onboarding contact tools", () => {
       communicationType: "Phone",
       defaultFlag: true,
     });
+  });
+
+  it("cw_update_contact_communication patches only the passed fields", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(fakeResponse({ id: 501 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    toolText(
+      await mcp("tools/call", {
+        name: "cw_update_contact_communication",
+        arguments: { id: 42, communicationId: 501, typeName: "Direct", value: "555-0200", extension: "12" },
+      }),
+    );
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, { method: string; body: string }];
+    expect(url).toContain("/company/contacts/42/communications/501");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body)).toEqual([
+      { op: "replace", path: "type", value: { name: "Direct" } },
+      { op: "replace", path: "value", value: "555-0200" },
+      { op: "replace", path: "extension", value: "12" },
+    ]);
+  });
+
+  it("cw_update_contact_communication rejects a call with nothing to change", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(
+      toolError(
+        await mcp("tools/call", {
+          name: "cw_update_contact_communication",
+          arguments: { id: 42, communicationId: 501 },
+        }),
+      ),
+    ).toContain("at least one of");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("cw_list_sites and cw_list_contact_types hit the Manage list endpoints", async () => {

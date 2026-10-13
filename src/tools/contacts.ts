@@ -185,13 +185,42 @@ export function registerContactTools(server: McpServer, client: CwManageClient) 
 
   server.tool(
     "cw_add_contact_communication",
-    "Add one phone, email or fax item to an existing contact without touching its other items (Manage POST /company/contacts/{id}/communications). Use this instead of replacing the whole communicationItems array with cw_update_contact.",
+    "Add one phone, email or fax item to an existing contact without touching its other items (Manage POST /company/contacts/{id}/communications). Use this instead of replacing the whole communicationItems array with cw_update_contact; to change an existing item use cw_update_contact_communication.",
     {
       id: z.number().describe("Contact ID"),
       ...contactCommunicationItem.shape,
     },
     async ({ id, ...item }) => {
       const result = await client.post(`/company/contacts/${id}/communications`, toCommunicationItem(item));
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.tool(
+    "cw_update_contact_communication",
+    "Update one existing phone, email or fax item of a contact without touching its other items (Manage PATCH /company/contacts/{id}/communications/{communicationId}). Get communicationId from the communicationItems[].id of cw_get_contact. Only the fields you pass are changed.",
+    {
+      id: z.number().describe("Contact ID"),
+      communicationId: z.number().describe("Communication item ID (communicationItems[].id from cw_get_contact)"),
+      communicationType: contactCommunicationItem.shape.communicationType.optional(),
+      typeName: contactCommunicationItem.shape.typeName.optional(),
+      value: contactCommunicationItem.shape.value.optional(),
+      extension: z.string().optional().describe("Phone extension; pass an empty string to clear it"),
+      defaultFlag: contactCommunicationItem.shape.defaultFlag,
+    },
+    async ({ id, communicationId, communicationType, typeName, value, extension, defaultFlag }) => {
+      const operations: Array<{ op: "replace"; path: string; value: unknown }> = [];
+      if (communicationType !== undefined) operations.push({ op: "replace", path: "communicationType", value: communicationType });
+      if (typeName !== undefined) operations.push({ op: "replace", path: "type", value: { name: typeName } });
+      if (value !== undefined) operations.push({ op: "replace", path: "value", value });
+      if (extension !== undefined) operations.push({ op: "replace", path: "extension", value: extension });
+      if (defaultFlag !== undefined) operations.push({ op: "replace", path: "defaultFlag", value: defaultFlag });
+      if (operations.length === 0) {
+        throw new Error(
+          "cw_update_contact_communication needs at least one of communicationType, typeName, value, extension, defaultFlag.",
+        );
+      }
+      const result = await client.patch(`/company/contacts/${id}/communications/${communicationId}`, operations);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     },
   );
