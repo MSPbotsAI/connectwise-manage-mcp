@@ -8,6 +8,7 @@ import worker from "../worker.js";
 import {
   CONTACT_TYPE_PATCH_ERROR,
   assertContactPatchOperations,
+  contactTypeConditions,
   contactTypeNameCondition,
   pickContactType,
 } from "../tools/contact-type-update.js";
@@ -84,12 +85,21 @@ describe("contact patch helpers", () => {
   });
 
   it("quotes contact type names for Manage conditions", () => {
-    expect(contactTypeNameCondition("Decision Maker")).toBe('name = "Decision Maker"');
-    expect(contactTypeNameCondition('Say "Hi"')).toBe('name = "Say \\"Hi\\""');
+    expect(contactTypeNameCondition("Decision Maker")).toBe('description = "Decision Maker"');
+    expect(contactTypeNameCondition('Say "Hi"')).toBe('description = "Say \\"Hi\\""');
+  });
+
+  it("rewrites bare name to description in contact type conditions", () => {
+    expect(contactTypeConditions('name like "Dec%"')).toBe('description like "Dec%"');
+    expect(contactTypeConditions('id > 2 and name="Primary"')).toBe('id > 2 and description="Primary"');
+    expect(contactTypeConditions('description = "x" and type/name = "y"')).toBe('description = "x" and type/name = "y"');
+    expect(contactTypeConditions(undefined)).toBeUndefined();
   });
 
   it("picks a single contact type by name", () => {
-    expect(pickContactType([{ id: 5, name: "Decision Maker" }, { id: 2, name: "Primary" }], "decision maker")).toEqual({
+    expect(
+      pickContactType([{ id: 5, description: "Decision Maker" }, { id: 2, description: "Primary" }], "decision maker"),
+    ).toEqual({
       id: 5,
       name: "Decision Maker",
     });
@@ -200,7 +210,7 @@ describe("cw_update_contact_types", () => {
     };
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(fakeResponse([{ id: 5, name: "Decision Maker" }]))
+      .mockResolvedValueOnce(fakeResponse([{ id: 5, description: "Decision Maker" }]))
       .mockResolvedValueOnce(fakeResponse([]))
       .mockResolvedValueOnce(fakeResponse(created));
     vi.stubGlobal("fetch", fetchMock);
@@ -219,7 +229,7 @@ describe("cw_update_contact_types", () => {
 
     const [typesUrl] = fetchMock.mock.calls[0] as [string];
     expect(typesUrl).toContain("/company/contacts/types");
-    expect(new URL(typesUrl).searchParams.get("conditions")).toBe('name = "Decision Maker"');
+    expect(new URL(typesUrl).searchParams.get("conditions")).toBe('description = "Decision Maker"');
 
     const [listUrl, listInit] = fetchMock.mock.calls[1] as [string, { method?: string }];
     expect(listUrl).toContain("/company/contacts/42/typeAssociations");
@@ -407,13 +417,20 @@ describe("PRD-20219 onboarding contact tools", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(fakeResponse([{ id: 7, name: "Main" }]))
-      .mockResolvedValueOnce(fakeResponse([{ id: 2, name: "Primary" }]));
+      .mockResolvedValueOnce(fakeResponse([{ id: 2, description: "Primary", defaultFlag: false }]));
     vi.stubGlobal("fetch", fetchMock);
 
     expect(toolText(await mcp("tools/call", { name: "cw_list_sites", arguments: { companyId: 5 } }))).toContain("Main");
-    expect(toolText(await mcp("tools/call", { name: "cw_list_contact_types", arguments: {} }))).toContain("Primary");
+    const types = JSON.parse(
+      toolText(await mcp("tools/call", { name: "cw_list_contact_types", arguments: { conditions: 'name like "Pri%"' } })),
+    );
+    expect(types).toEqual([{ id: 2, description: "Primary", defaultFlag: false, name: "Primary" }]);
 
     expect(fetchMock.mock.calls[0][0] as string).toContain("/company/companies/5/sites");
-    expect(fetchMock.mock.calls[1][0] as string).toContain("/company/contacts/types");
+    const typesUrl = new URL(fetchMock.mock.calls[1][0] as string);
+    expect(typesUrl.pathname).toContain("/company/contacts/types");
+    // Manage ContactType has no `name` field; orderBy/conditions on it return 400.
+    expect(typesUrl.searchParams.get("orderBy")).toBe("description asc");
+    expect(typesUrl.searchParams.get("conditions")).toBe('description like "Pri%"');
   });
 });

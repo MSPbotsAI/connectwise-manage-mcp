@@ -28,13 +28,29 @@ export function quoteCwString(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
+/**
+ * Manage's ContactType has no `name` field: the label lives in `description`
+ * (orderBy/conditions on `name` return 400). Type references inside
+ * typeAssociations do use `name`.
+ */
 export function contactTypeNameCondition(typeName: string): string {
-  return `name = ${quoteCwString(typeName)}`;
+  return `description = ${quoteCwString(typeName)}`;
+}
+
+/** Rewrites bare `name` in caller conditions to `description` for /company/contacts/types. */
+export function contactTypeConditions(conditions: string | undefined): string | undefined {
+  return conditions?.replace(/(^|[^\w/.])name(?=\s*(?:[=!<>]|like\b|not\b|contains\b|in\b))/gi, "$1description");
 }
 
 export interface ContactTypeRecord {
   id?: number;
+  description?: string;
   name?: string;
+}
+
+/** Adds `name` (= description) so callers see the same label as typeAssociations. */
+export function withContactTypeName<T extends ContactTypeRecord>(type: T): T & { name?: string } {
+  return { ...type, name: type.name ?? type.description };
 }
 
 export interface ContactTypeAssociation {
@@ -48,13 +64,13 @@ export function pickContactType(
   typeName: string,
 ): { id: number; name: string } {
   const wanted = typeName.trim().toLowerCase();
-  const matches = types.filter(
-    (type): type is { id: number; name: string } =>
-      typeof type.id === "number" &&
-      typeof type.name === "string" &&
-      type.name.toLowerCase() === wanted,
-  );
-  if (matches.length === 1) return matches[0];
+  const matches = types
+    .map(withContactTypeName)
+    .filter(
+      (type): type is ContactTypeRecord & { id: number; name: string } =>
+        typeof type.id === "number" && typeof type.name === "string" && type.name.toLowerCase() === wanted,
+    );
+  if (matches.length === 1) return { id: matches[0].id, name: matches[0].name };
   const quoted = quoteCwString(typeName.trim());
   if (matches.length === 0) {
     throw new Error(

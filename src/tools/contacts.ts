@@ -6,9 +6,11 @@ import {
   asContactList,
   assertContactPatchOperations,
   assertContactTypeUpdateArgs,
+  contactTypeConditions,
   contactTypeNameCondition,
   findTypeAssociations,
   pickContactType,
+  withContactTypeName,
   type ContactTypeAssociation,
   type ContactTypeRecord,
 } from "./contact-type-update.js";
@@ -197,15 +199,19 @@ export function registerContactTools(server: McpServer, client: CwManageClient) 
     "cw_list_contact_types",
     "List contact types (e.g. Primary, Decision Maker) with their IDs, for cw_create_contact typeIds or cw_update_contact_types.",
     {
-      conditions: z.string().optional().describe('Optional filter, e.g. name like "Dec%"'),
+      conditions: z
+        .string()
+        .optional()
+        .describe('Optional filter on the type label, e.g. description like "Dec%" (Manage stores the label in description; name is accepted and rewritten)'),
       pageSize: z.number().optional().describe("Results per page (default: 100, max: 1000)"),
     },
     async ({ conditions, pageSize }) => {
-      const result = await client.get("/company/contacts/types", {
-        conditions,
+      const listed = await client.get<unknown>("/company/contacts/types", {
+        conditions: contactTypeConditions(conditions),
         pageSize: pageSize ?? 100,
-        orderBy: "name asc",
+        orderBy: "description asc",
       });
+      const result = Array.isArray(listed) ? listed.map(withContactTypeName) : listed;
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     },
   );
