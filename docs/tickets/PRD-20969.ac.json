@@ -1,0 +1,146 @@
+[
+  {
+    "id": "TC1",
+    "ac": "AC1",
+    "text": "Given no boardId, When cw_list_ticket_types is called, Then the zod schema rejects it before any HTTP call",
+    "type": "auto",
+    "tests": ["src/__tests__/service.test.ts::cw_list_ticket_types schema requires boardId"]
+  },
+  {
+    "id": "TC2",
+    "ac": "AC1",
+    "text": "Given a boardId, When cw_list_ticket_types is called, Then it issues GET /service/boards/{boardId}/types with the supplied conditions/page/pageSize",
+    "type": "auto",
+    "tests": ["src/__tests__/service.test.ts::cw_list_ticket_types calls GET /service/boards/:id/types"]
+  },
+  {
+    "id": "TC3",
+    "ac": "AC2",
+    "text": "Given no boardId, When cw_list_ticket_subtypes is called, Then the zod schema rejects it before any HTTP call",
+    "type": "auto",
+    "tests": ["src/__tests__/service.test.ts::cw_list_ticket_subtypes schema requires boardId"]
+  },
+  {
+    "id": "TC4",
+    "ac": "AC2",
+    "text": "Given a boardId, When cw_list_ticket_subtypes is called, Then it issues GET /service/boards/{boardId}/subtypes",
+    "type": "auto",
+    "tests": ["src/__tests__/service.test.ts::cw_list_ticket_subtypes calls GET /service/boards/:id/subtypes"]
+  },
+  {
+    "id": "TC5",
+    "ac": "AC3",
+    "text": "Given no boardId, When cw_list_ticket_items is called, Then the zod schema rejects it before any HTTP call",
+    "type": "auto",
+    "tests": ["src/__tests__/service.test.ts::cw_list_ticket_items schema requires boardId"]
+  },
+  {
+    "id": "TC6",
+    "ac": "AC3",
+    "text": "Given a boardId, When cw_list_ticket_items is called, Then it issues GET /service/boards/{boardId}/items",
+    "type": "auto",
+    "tests": ["src/__tests__/service.test.ts::cw_list_ticket_items calls GET /service/boards/:id/items"]
+  },
+  {
+    "id": "TC7",
+    "ac": "AC4",
+    "text": "Given itemId is supplied to cw_create_ticket, Then the outbound body includes \"item\": { \"id\": itemId } alongside type/subType",
+    "type": "auto",
+    "tests": ["src/__tests__/tickets.test.ts::cw_create_ticket forwards itemId as body.item.id"]
+  },
+  {
+    "id": "TC8",
+    "ac": "AC4",
+    "text": "Given real type/subtype/item IDs from a non-production ConnectWise company, When a ticket is created with all three, Then the Manage UI shows the ticket carrying all three classifications",
+    "type": "manual",
+    "steps": [
+      "Obtain a non-production ConnectWise Manage company and board",
+      "Call cw_list_ticket_types/subtypes/items for that board to pick one valid id of each",
+      "Call cw_create_ticket with typeId, subTypeId, itemId set to those ids",
+      "Open the created ticket in the Manage UI"
+    ],
+    "expect": "The ticket's Type, Sub-Type, and Item fields show the exact three values chosen",
+    "result": "untested",
+    "evidence": "lab blind spot: no sandbox ConnectWise Manage company reachable from this pipeline (see reference_sandbox_no_network_to_live_services)"
+  },
+  {
+    "id": "TC9",
+    "ac": "AC6",
+    "text": "Given no input, When cw_list_work_types / cw_list_work_roles are called, Then they issue GET /time/workTypes / GET /time/workRoles respectively with no required parameters",
+    "type": "auto",
+    "tests": [
+      "src/__tests__/time-entries.test.ts::cw_list_work_types calls GET /time/workTypes",
+      "src/__tests__/time-entries.test.ts::cw_list_work_roles calls GET /time/workRoles"
+    ]
+  },
+  {
+    "id": "TC10",
+    "ac": "AC7",
+    "text": "Given workTypeId/workRoleId are supplied to cw_create_time_entry, Then the outbound body includes workType.id / workRole.id exactly as it does today (regression guard)",
+    "type": "auto",
+    "tests": ["src/__tests__/time-entries.test.ts::cw_create_time_entry still forwards workTypeId/workRoleId unchanged"]
+  },
+  {
+    "id": "TC11",
+    "ac": "AC8",
+    "text": "Given billableOption is supplied to cw_create_time_entry with one of the four valid values, Then the outbound body includes billableOption verbatim; given an invalid value, Then the zod schema rejects it before any HTTP call",
+    "type": "auto",
+    "tests": [
+      "src/__tests__/time-entries.test.ts::cw_create_time_entry forwards a valid billableOption",
+      "src/__tests__/time-entries.test.ts::cw_create_time_entry schema rejects an invalid billableOption"
+    ]
+  },
+  {
+    "id": "TC12",
+    "ac": "AC9",
+    "text": "Given any combination of addToDetailDescriptionFlag/addToInternalAnalysisFlag/addToResolutionFlag is supplied, Then the outbound body includes only the flags explicitly set",
+    "type": "auto",
+    "tests": ["src/__tests__/time-entries.test.ts::cw_create_time_entry forwards only the addTo*Flag fields that were set"]
+  },
+  {
+    "id": "TC13",
+    "ac": "AC9",
+    "text": "Given a time entry created against a non-production ConnectWise ticket with notes + addToResolutionFlag: true, Then the ticket's Resolution section shows that note content",
+    "type": "manual",
+    "steps": [
+      "Obtain a non-production ConnectWise Manage ticket",
+      "Call cw_create_time_entry with notes set to a distinctive string and addToResolutionFlag: true",
+      "Open the ticket in the Manage UI, Resolution tab"
+    ],
+    "expect": "The distinctive note text appears in the ticket's Resolution section",
+    "result": "untested",
+    "evidence": "lab blind spot: no sandbox ConnectWise Manage company reachable from this pipeline (see reference_sandbox_no_network_to_live_services)"
+  },
+  {
+    "id": "TC14",
+    "ac": "AC10",
+    "text": "Given cw_create_time_entry is called with only the fields it accepted before this change, Then the outbound body is byte-identical to pre-change behavior",
+    "type": "auto",
+    "tests": ["src/__tests__/time-entries.test.ts::cw_create_time_entry body is unchanged when no new fields are supplied"]
+  },
+  {
+    "id": "TC15",
+    "ac": "AC5",
+    "text": "Given no boardId, When any of the three new board-scoped lookups is called, Then none of them issues an HTTP request (schema rejection happens first for all three)",
+    "type": "auto",
+    "tests": [
+      "src/__tests__/service.test.ts::cw_list_ticket_types schema requires boardId",
+      "src/__tests__/service.test.ts::cw_list_ticket_subtypes schema requires boardId",
+      "src/__tests__/service.test.ts::cw_list_ticket_items schema requires boardId"
+    ]
+  },
+  {
+    "id": "TC16",
+    "ac": "AC11",
+    "text": "Given the code at src/mcp-server.ts:119-156, confirmed by inspection that every register*Tools call -- including the five new tools -- receives the same per-request client as every existing tool, with no module-level/shared client instance in the five new tool registrations",
+    "type": "manual",
+    "steps": [
+      "Read src/mcp-server.ts:97-156 createMcpServer",
+      "Confirm registerServiceTools(server, client) and registerTimeEntryTools(server, client) are called with the single locally-scoped client built from configOverride ?? getConfig() for that invocation",
+      "Confirm the five new tools added inside service.ts/time-entries.ts take client as a function parameter from registerServiceTools/registerTimeEntryTools, not an import of a shared singleton"
+    ],
+    "expect": "No new tool reads credentials from anywhere other than the client parameter passed into its register*Tools call",
+    "result": "untested",
+    "evidence": "no two-credential integration harness in this environment; this is a code-review check, not a live multi-tenant call (see Tech design > Non-functional > Multi-tenant isolation)"
+  }
+]
