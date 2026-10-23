@@ -81,7 +81,7 @@ needed.
 - `cw_get_ticket` — Get a ticket by ID
 - `cw_get_ticket_configurations` — List configuration references associated with a service ticket (paged)
 - `cw_update_ticket_configurations` — Add/remove ticket configuration associations in an ordered batch, reporting every outcome
-- `cw_create_ticket` — Create a new service ticket. Optional `parentTicketId` (the same field `cw_get_ticket` returns) creates the ticket as a child of that parent.
+- `cw_create_ticket` — Create a new service ticket. Optional `parentTicketId` (the same field `cw_get_ticket` returns) creates the ticket as a child of that parent. Optional `itemId` sets the ticket's item classification alongside `typeId`/`subTypeId`; discover valid IDs with `cw_list_ticket_types`/`cw_list_ticket_subtypes`/`cw_list_ticket_items`.
 - `cw_update_ticket` — Update a ticket (JSON Patch)
 - `cw_get_ticket_notes` — Get all notes on a ticket (including child ticket notes)
 - `cw_add_ticket_note` — Add a note to a ticket (discussion, internal, or resolution). Optional `emailContactFlag`, `emailResourceFlag`, `emailCcFlag`, and `emailCc` control who is emailed. **Nothing is emailed unless one of those flags is set** (or you set `processNotifications`). Omitting them does not email the contact. The create response reports `internalFlag` / `externalFlag` from the note type that was stored, so an internal note is not also reported as external.
@@ -111,9 +111,11 @@ needed.
 ### Time Entries
 - `cw_search_time_entries` — Search time entries
 - `cw_get_time_entry` — Get a time entry by ID
-- `cw_create_time_entry` — Create a new time entry
+- `cw_create_time_entry` — Create a new time entry. Optional `billableOption` (`Billable`/`DoNotBill`/`NoCharge`/`NoDefault`) and `addToDetailDescriptionFlag`/`addToInternalAnalysisFlag`/`addToResolutionFlag` route the entry's notes into the ticket's corresponding section at creation time. Discover valid `workTypeId`/`workRoleId` with `cw_list_work_types`/`cw_list_work_roles`.
 - `cw_update_time_entry` — Correct a time entry (JSON Patch on `PATCH /time/entries/{id}`). Use this to fix `actualHours` when a metered agreement rounds to 0.25.
 - `cw_delete_time_entry` — Delete a time entry (`DELETE /time/entries/{id}`). Manage rejects deletes of entries that are already billed.
+- `cw_list_work_types` — List work types
+- `cw_list_work_roles` — List work roles
 
 ### Schedule Entries
 - `cw_search_schedule_entries` — Search booked resource time
@@ -134,6 +136,9 @@ needed.
 - `cw_list_boards` — List service boards
 - `cw_list_priorities` — List ticket priorities
 - `cw_list_statuses` — List statuses for a board
+- `cw_list_ticket_types` — List ticket types configured for a board
+- `cw_list_ticket_subtypes` — List ticket subtypes configured for a board
+- `cw_list_ticket_items` — List ticket items configured for a board
 
 ### Activities
 - `cw_search_activities` — Search activities

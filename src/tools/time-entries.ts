@@ -49,8 +49,39 @@ export function registerTimeEntryTools(server: McpServer, client: CwManageClient
       internalNotes: z.string().optional().describe("Internal-only notes"),
       workTypeId: z.number().optional().describe("Work type ID"),
       workRoleId: z.number().optional().describe("Work role ID"),
+      billableOption: z
+        .enum(["Billable", "DoNotBill", "NoCharge", "NoDefault"])
+        .optional()
+        .describe("Billing classification for this time entry"),
+      addToDetailDescriptionFlag: z
+        .boolean()
+        .optional()
+        .describe("Route this entry's notes into the ticket's detail description"),
+      addToInternalAnalysisFlag: z
+        .boolean()
+        .optional()
+        .describe("Route this entry's notes into the ticket's internal analysis"),
+      addToResolutionFlag: z
+        .boolean()
+        .optional()
+        .describe("Route this entry's notes into the ticket's resolution"),
     },
-    async ({ chargeToType, chargeToId, memberId, timeStart, timeEnd, actualHours, notes, internalNotes, workTypeId, workRoleId }) => {
+    async ({
+      chargeToType,
+      chargeToId,
+      memberId,
+      timeStart,
+      timeEnd,
+      actualHours,
+      notes,
+      internalNotes,
+      workTypeId,
+      workRoleId,
+      billableOption,
+      addToDetailDescriptionFlag,
+      addToInternalAnalysisFlag,
+      addToResolutionFlag,
+    }) => {
       const body: Record<string, unknown> = {
         chargeToType,
         chargeToId,
@@ -63,6 +94,10 @@ export function registerTimeEntryTools(server: McpServer, client: CwManageClient
       if (internalNotes) body.internalNotes = internalNotes;
       if (workTypeId) body.workType = { id: workTypeId };
       if (workRoleId) body.workRole = { id: workRoleId };
+      if (billableOption) body.billableOption = billableOption;
+      if (addToDetailDescriptionFlag !== undefined) body.addToDetailDescriptionFlag = addToDetailDescriptionFlag;
+      if (addToInternalAnalysisFlag !== undefined) body.addToInternalAnalysisFlag = addToInternalAnalysisFlag;
+      if (addToResolutionFlag !== undefined) body.addToResolutionFlag = addToResolutionFlag;
 
       const result = await client.post("/time/entries", body);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
@@ -101,6 +136,44 @@ export function registerTimeEntryTools(server: McpServer, client: CwManageClient
       return {
         content: [{ type: "text", text: JSON.stringify({ id, deleted: true }, null, 2) }],
       };
+    },
+  );
+
+  // PRD-20969: discover valid work type/role IDs without inspecting existing
+  // time entries, so cw_create_time_entry can be called correctly up front.
+  server.tool(
+    "cw_list_work_types",
+    "List work types configured in ConnectWise Manage.",
+    {
+      conditions: z.string().optional().describe("ConnectWise conditions query string"),
+      page: z.number().optional().describe("Page number (default: 1)"),
+      pageSize: z.number().optional().describe("Results per page (default: 25, max: 1000)"),
+    },
+    async ({ conditions, page, pageSize }) => {
+      const result = await client.get("/time/workTypes", {
+        conditions,
+        page: page ?? 1,
+        pageSize: pageSize ?? 25,
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.tool(
+    "cw_list_work_roles",
+    "List work roles configured in ConnectWise Manage.",
+    {
+      conditions: z.string().optional().describe("ConnectWise conditions query string"),
+      page: z.number().optional().describe("Page number (default: 1)"),
+      pageSize: z.number().optional().describe("Results per page (default: 25, max: 1000)"),
+    },
+    async ({ conditions, page, pageSize }) => {
+      const result = await client.get("/time/workRoles", {
+        conditions,
+        page: page ?? 1,
+        pageSize: pageSize ?? 25,
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     },
   );
 }
