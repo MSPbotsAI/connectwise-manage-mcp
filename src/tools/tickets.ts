@@ -131,6 +131,7 @@ export function registerTicketTools(server: McpServer, client: CwManageClient) {
       priorityId: z.number().optional().describe("Priority ID"),
       typeId: z.number().optional().describe("Type ID"),
       subTypeId: z.number().optional().describe("SubType ID"),
+      itemId: z.number().optional().describe("Item ID"),
       initialDescription: z.string().optional().describe("Initial ticket description"),
       parentTicketId: z
         .number()
@@ -139,7 +140,7 @@ export function registerTicketTools(server: McpServer, client: CwManageClient) {
           "Parent ticket id (Manage Ticket.parentTicketId). When set, the new ticket is created as a child of this ticket. Omit to leave it unparented. Same field cw_get_ticket returns.",
         ),
     },
-    async ({ summary, boardId, companyId, contactId, statusId, priorityId, typeId, subTypeId, initialDescription, parentTicketId }) => {
+    async ({ summary, boardId, companyId, contactId, statusId, priorityId, typeId, subTypeId, itemId, initialDescription, parentTicketId }) => {
       const body: Record<string, unknown> = { summary };
       if (boardId) body.board = { id: boardId };
       if (companyId) body.company = { id: companyId };
@@ -148,6 +149,7 @@ export function registerTicketTools(server: McpServer, client: CwManageClient) {
       if (priorityId) body.priority = { id: priorityId };
       if (typeId) body.type = { id: typeId };
       if (subTypeId) body.subType = { id: subTypeId };
+      if (itemId) body.item = { id: itemId };
       if (initialDescription) body.initialDescription = initialDescription;
       if (parentTicketId !== undefined) body.parentTicketId = parentTicketId;
 
@@ -158,7 +160,7 @@ export function registerTicketTools(server: McpServer, client: CwManageClient) {
 
   server.tool(
     "cw_update_ticket",
-    "Update an existing service ticket using JSON Patch operations.",
+    "Update an existing service ticket using JSON Patch operations. Example path: 'item/id' to change the ticket's item classification.",
     {
       id: z.number().describe("Ticket ID"),
       operations: z
